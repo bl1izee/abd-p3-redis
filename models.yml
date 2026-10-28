@@ -1,0 +1,88 @@
+# Definición de los modelos del ODM.
+#
+# Por cada modelo se declara:
+#   required_vars    atributos que TIENEN que estar en cada documento
+#   admissible_vars  atributos válidos que no tienen por qué estar en cada documento
+#   unique_indexes   índices con restricción de unicidad
+#   regular_indexes  índices ascendentes normales
+#   location_index   campo de dirección del que se derivará el punto GeoJSON
+#
+# Ojo con location_index: se declara el campo BASE de la dirección. El punto
+# GeoJSON se guardará en <campo>_loc, y es sobre ese campo sobre el que hay
+# que crear el índice 2dsphere.
+#
+# Este fichero es un EJEMPLO con un solo modelo. Hay que sustituirlo por los
+# cuatro modelos de EnVivo: recinto, artista, evento y asistente.
+
+# Hemos integrado los atributos/vars obligatorio también en los admitidos, esto nos ayuda mas adelante en __init__ a realizar las comprobaciones
+recinto:
+  required_vars:
+    - nombre
+    - direccion
+    - aforo
+    - zona
+  admissible_vars:
+    - servicios
+    - nombre
+    - direccion
+    - aforo
+    - zona
+  unique_indexes:
+    - direccion
+  regular_indexes:
+    - nombre
+  location_index: direccion
+
+artista:
+  required_vars:
+    - nombre
+    - genero
+  admissible_vars:
+    - age # año de inicio
+    - pais
+    - nombre
+    - genero # genero musical
+  unique_indexes: # ID
+  regular_indexes:
+   - genero
+   - nombre
+
+evento:
+  required_vars:
+    - titulo
+    - recinto
+    - fecha_hora
+    - zona
+    - artistas
+  admissible_vars:
+    - entradas_vendidas
+    - titulo
+    - recinto
+    - fecha_hora
+    - zona
+    - precio_zona
+    - artistas
+  unique_indexes: # ID
+  regular_indexes:
+    - titulo
+    - artistas
+
+asistente:
+  required_vars:
+    - nombre
+    - correo
+    - fecha
+    - direccion
+  admissible_vars:
+    - genero
+    - nombre
+    - correo
+    - fecha
+    - direccion
+  unique_indexes:
+    - correo
+  regular_indexes:
+    - nombre
+    - correo
+    - direccion
+  location_index: direccion
