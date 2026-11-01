@@ -6,6 +6,9 @@ retorno **no deben cambiarse**: son el contrato con el que se corrige.
 
 import redis
 
+# El módulo nativo json de Python solo entiende tipos de datos básicos, no entiende datetime o ObjectId. En cambio json_util si.
+from bson import json_util
+
 TTL_POR_DEFECTO = 24 * 60 * 60      # 24 horas
 MEMORIA_MAXIMA = "150mb"
 POLITICA_DESALOJO = None            # TODO: la política que pide el enunciado
@@ -36,6 +39,7 @@ class CacheDocumentos:
         Cada acceso debe **renovar la caducidad** a `self.ttl`.
         """
         # TODO
+        # usar json_util.loads
         raise NotImplementedError
 
     def set(self, coleccion: str, id_documento, documento: dict) -> None:
@@ -45,8 +49,15 @@ class CacheDocumentos:
         fechas y los ObjectId como ObjectId.
         """
         # TODO
-        raise NotImplementedError
-
+        # Construimos la clave en Redis (ej: "usuario:100")
+        key = f"{coleccion}:{id_documento}"
+        
+        # Serializamos usando json_util para conservar ObjectId, datetime, etc.
+        documento_serializado = json_util.dumps(documento)
+        
+        # Guardamos en Redis
+        self._r.set(key, documento_serializado, ex=TTL_POR_DEFECTO)
+        
     def invalidar(self, coleccion: str, id_documento) -> bool:
         """Saca el documento de la caché. Devuelve si estaba."""
         # TODO
