@@ -39,8 +39,21 @@ class CacheDocumentos:
         Cada acceso debe **renovar la caducidad** a `self.ttl`.
         """
         # TODO
-        # usar json_util.loads
-        raise NotImplementedError
+        # Construimos la clave 
+        key = f"{coleccion}:{id_documento}"
+
+        # Obtenemos el documento serialiado de redis
+        documento = self.redis.get(key)
+
+        # Comprobamos que el documento exista
+        if documento is None:
+            return None
+
+        # Reiniciamos la caducidad
+        self.redis.expire(key, self.ttl)
+
+        # Devolvemos el documento desserializado
+        return json_util.loads(documento)
 
     def set(self, coleccion: str, id_documento, documento: dict) -> None:
         """Guarda el documento en la caché con su caducidad.
@@ -49,7 +62,7 @@ class CacheDocumentos:
         fechas y los ObjectId como ObjectId.
         """
         # TODO
-        # Construimos la clave en Redis (ej: "usuario:100")
+        # Construimos la clave 
         key = f"{coleccion}:{id_documento}"
         
         # Serializamos usando json_util para conservar ObjectId, datetime, etc.
