@@ -31,7 +31,7 @@ class CacheDocumentos:
     def clave(coleccion: str, id_documento) -> str:
         """Clave de Redis para un documento. Formato: envivo:cache:<col>:<id>"""
         # TODO
-        return f"{coleccion}:{id_documento}"
+        return f"envivo:cache:{coleccion}:{id_documento}"
 
     def get(self, coleccion: str, id_documento) -> dict | None:
         """Devuelve el documento cacheado, o None si no está.
@@ -43,14 +43,14 @@ class CacheDocumentos:
         key = self.clave(coleccion, id_documento)
 
         # Obtenemos el documento serialiado de redis
-        documento = self.redis.get(key)
+        documento = self._r.get(key)
 
         # Comprobamos que el documento exista
         if documento is None:
             return None
 
         # Reiniciamos la caducidad
-        self.redis.expire(key, self.ttl)
+        self._r.expire(key, self.ttl)
 
         # Devolvemos el documento desserializado
         return json_util.loads(documento)
