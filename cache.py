@@ -11,7 +11,7 @@ from bson import json_util
 
 TTL_POR_DEFECTO = 24 * 60 * 60      # 24 horas
 MEMORIA_MAXIMA = "150mb"
-POLITICA_DESALOJO = None            # TODO: la política que pide el enunciado
+POLITICA_DESALOJO = "volatile-ttl"            # TODO: la política que pide el enunciado
 
 
 class CacheDocumentos:
@@ -24,8 +24,9 @@ class CacheDocumentos:
     def configurar_limite(self, memoria: str = MEMORIA_MAXIMA,
                           politica: str = POLITICA_DESALOJO) -> None:
         """Fija el límite de memoria y la política de desalojo de la caché."""
-        # TODO
-        raise NotImplementedError
+
+        self._r.config_set("maxmemory", memoria) # Maximo de memoria que puede utilizar
+        self._r.config_set("maxmemory-policy", politica) # Que documentos elimina Redis cuando necesita espacio
 
     @staticmethod
     def clave(coleccion: str, id_documento) -> str:
@@ -73,10 +74,12 @@ class CacheDocumentos:
         
     def invalidar(self, coleccion: str, id_documento) -> bool:
         """Saca el documento de la caché. Devuelve si estaba."""
-        # TODO
-        raise NotImplementedError
+
+        key = self.clave(coleccion, id_documento) # Construye la clave del documento
+        return self._r.delete(key) > 0  # Elimina el documento y devuelve True si existia
 
     def caducidad(self, coleccion: str, id_documento) -> int:
         """Segundos restantes. -1 si no caduca, -2 si no existe."""
-        # TODO
-        raise NotImplementedError
+
+        key = self.clave(coleccion, id_documento)
+        return self._r.ttl(key) # Consulta los segundos que le quedan antes de caducar
