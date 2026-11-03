@@ -11,6 +11,7 @@ import pymongo
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
+import cache
 import yaml
 
 def getLocationPoint(address: str) -> Point:
@@ -275,7 +276,25 @@ class Model:
                 Modelo del documento encontrado o None si no se encuentra
         """ 
         #TODO
-        pass
+        # Buscamos el documento en Redis
+        document = cache.get(cls._db.name, id)
+
+        # Si está en caché lo devolvemos
+        if document is not None:
+            return document
+
+        # Si no está en redis lo buscamos en mongo
+        document = cls._db.find_one({"_id": ObjectId(id)})
+
+        # Si tampoco existe en MongoDB, devolvemos None
+        if document is None:
+            return None
+
+        # Guardamos el documento en Redis
+        cache.set(cls._db.name, id, document)
+
+        # Devolvemos el documento como objeto del modelo
+        return cls(**document)
 
     @classmethod
     def init_class(cls, db_collection: pymongo.collection.Collection, indexes:dict[str,str], required_vars: set[str], admissible_vars: set[str]) -> None:

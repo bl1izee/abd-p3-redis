@@ -31,7 +31,7 @@ class CacheDocumentos:
     def clave(coleccion: str, id_documento) -> str:
         """Clave de Redis para un documento. Formato: envivo:cache:<col>:<id>"""
         # TODO
-        raise NotImplementedError
+        return f"{coleccion}:{id_documento}"
 
     def get(self, coleccion: str, id_documento) -> dict | None:
         """Devuelve el documento cacheado, o None si no está.
@@ -40,7 +40,7 @@ class CacheDocumentos:
         """
         # TODO
         # Construimos la clave 
-        key = f"{coleccion}:{id_documento}"
+        key = self.clave(coleccion, id_documento)
 
         # Obtenemos el documento serialiado de redis
         documento = self.redis.get(key)
@@ -63,7 +63,7 @@ class CacheDocumentos:
         """
         # TODO
         # Construimos la clave 
-        key = f"{coleccion}:{id_documento}"
+        key = self.clave(coleccion, id_documento)
         
         # Serializamos usando json_util para conservar ObjectId, datetime, etc.
         documento_serializado = json_util.dumps(documento)
