@@ -10,13 +10,12 @@ Las firmas y los valores de retorno **no deben cambiarse**.
 import redis
 
 # TODO: mayor que cualquier prioridad presente o futura.
-PRIORIDAD_ABSOLUTA = None
-
+PRIORIDAD_ABSOLUTA = float("inf")
 
 def clave(evento_id) -> str:
     """Clave de Redis. Formato: envivo:sala:<evento>"""
-    # TODO
-    raise NotImplementedError
+
+    return f"envivo:sala:{evento_id}"
 
 
 def entrar(r: redis.Redis, evento_id, usuario_id, prioridad: float) -> bool:
@@ -25,8 +24,34 @@ def entrar(r: redis.Redis, evento_id, usuario_id, prioridad: float) -> bool:
     Devuelve True si es nuevo en la cola y False si ya estaba (en ese caso se
     le actualiza la prioridad). Un usuario **no puede ocupar dos puestos**.
     """
-    # TODO
-    raise NotImplementedError
+
+    # Si la prioridad es absoluta, utilizamos +inf
+    if float(prioridad) == PRIORIDAD_ABSOLUTA:
+        prioridad = "+inf"
+    else:
+        prioridad = repr(float(prioridad))
+
+    script = """
+    local existe = redis.call('ZSCORE', KEYS[1], ARGV[1])
+
+    redis.call('ZADD', KEYS[1], ARGV[2], ARGV[1])
+
+    if existe then
+        return 0
+    else
+        return 1
+    end
+    """
+
+    resultado = r.eval(
+        script,
+        1,
+        clave(evento_id),
+        str(usuario_id),
+        prioridad
+    )
+
+    return bool(resultado)
 
 
 def atender_siguiente(r: redis.Redis, evento_id, timeout: int = 0):
@@ -36,14 +61,32 @@ def atender_siguiente(r: redis.Redis, evento_id, timeout: int = 0):
     Con `timeout=0` espera indefinidamente. Obtener y eliminar deben ser una
     sola operación, o dos operadores podrían atender al mismo usuario.
     """
-    # TODO
-    raise NotImplementedError
+
+    # BZPOPMAX obtiene y elimina el usuario con mayor prioridad.
+    # Si la cola esta vacia, espera hasta que llegue una peticion.
+    resultado = r.bzpopmax(clave(evento_id), timeout=timeout)
+
+    # Si se agota el tiempo y no llega nadie, devuelve None.
+    if resultado is None:
+        return None
+
+    # Redis devuelve la clave, el usuario y su prioridad.
+    _, usuario_id, prioridad = resultado
+
+    if isinstance(usuario_id, bytes):
+        usuario_id = usuario_id.decode("utf-8")
+
+    # Convertimos la prioridad a numero decimal.
+    prioridad = float(prioridad)
+
+    return usuario_id, prioridad
 
 
 def en_espera(r: redis.Redis, evento_id) -> int:
     """Cuántos usuarios hay en la sala."""
-    # TODO
-    raise NotImplementedError
+
+    # ZCARD devuelve el numero de elementos
+    return r.zcard(clave(evento_id))
 
 
 def posicion(r: redis.Redis, evento_id, usuario_id) -> int | None:
@@ -51,5 +94,13 @@ def posicion(r: redis.Redis, evento_id, usuario_id) -> int | None:
 
     El puesto 1 es el que se va a atender antes.
     """
-    # TODO
-    raise NotImplementedError
+
+    # ZREVRANK obtiene la posicion ordenando de mayor a menor prioridad.
+    puesto = r.zrevrank(clave(evento_id), str(usuario_id))
+
+    # Si el usuario no esta en la cola, devuelve None.
+    if puesto is None:
+        return None
+
+    # Redis empieza a contar desde 0, por eso sumamos 1.
+    return puesto + 1
