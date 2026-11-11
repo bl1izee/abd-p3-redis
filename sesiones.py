@@ -115,12 +115,11 @@ def borrar_usuario(r: redis.Redis, usuario: str) -> bool:
         # Creamos la clave de la sesión
         claveS = clave_sesion(token)
 
-        # Eliminamos la sesión si existe
-        if r.exists(claveS):
-            r.delete(claveS)
+        # Eliminamos la sesión
+        r.delete(claveS)
 
-        # Eliminamos el usuario
-        r.delete(claveU)
+    # Eliminamos el usuario
+    r.delete(claveU)
 
     return True
 

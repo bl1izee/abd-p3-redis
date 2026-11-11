@@ -26,11 +26,10 @@ def entrar(r: redis.Redis, evento_id, usuario_id, prioridad: float) -> bool:
     """
 
     # Si la prioridad es absoluta, utilizamos +inf
-    if float(prioridad) == PRIORIDAD_ABSOLUTA:
+    if prioridad == PRIORIDAD_ABSOLUTA:
         prioridad = "+inf"
-    else:
-        prioridad = repr(float(prioridad))
 
+    # Comprueba que el usuario esté ya en la cola (no puede ocupar dos puestos)
     script = """
     local existe = redis.call('ZSCORE', KEYS[1], ARGV[1])
 
@@ -85,7 +84,7 @@ def atender_siguiente(r: redis.Redis, evento_id, timeout: int = 0):
 def en_espera(r: redis.Redis, evento_id) -> int:
     """Cuántos usuarios hay en la sala."""
 
-    # ZCARD devuelve el numero de elementos
+    # ZCARD devuelve el numero de elementos hay en la sala
     return r.zcard(clave(evento_id))
 
 
