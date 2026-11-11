@@ -291,12 +291,16 @@ class Model:
                 Modelo del documento encontrado o None si no se encuentra
         """ 
         #TODO
+        # Comprobamos que estemos usando la caché
+        if (cls._cache is None):
+            return None
+
         # Buscamos el documento en Redis
-        document = cache.get(cls._db.name, id)
+        document = cls._cache.get(cls._db.name, id)
 
         # Si está en caché lo devolvemos
         if document is not None:
-            return document
+            return cls(**document)
 
         # Si no está en redis lo buscamos en mongo
         document = cls._db.find_one({"_id": ObjectId(id)})
@@ -306,7 +310,7 @@ class Model:
             return None
 
         # Guardamos el documento en Redis
-        cache.set(cls._db.name, id, document)
+        cls._cache.set(cls._db.name, id, document)
 
         # Devolvemos el documento como objeto del modelo
         return cls(**document)

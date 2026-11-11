@@ -70,7 +70,7 @@ class CacheDocumentos:
         documento_serializado = json_util.dumps(documento)
         
         # Guardamos en Redis
-        self._r.set(key, documento_serializado, ex=TTL_POR_DEFECTO)
+        self._r.set(key, documento_serializado, ex=self.ttl)
         
     def invalidar(self, coleccion: str, id_documento) -> bool:
         """Saca el documento de la caché. Devuelve si estaba."""
