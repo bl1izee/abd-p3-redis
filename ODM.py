@@ -13,6 +13,7 @@ from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
 import cache
 import yaml
+import redis 
 
 def getLocationPoint(address: str) -> Point:
     """ 
@@ -101,6 +102,7 @@ class Model:
     _location_var: str | None = None
     _db: pymongo.collection.Collection
     _internal_vars: set[str] = frozenset(('_modified_vars', '_required_vars', '_admissible_vars', '_db', '_data', '_location_var'))
+    _cache = None  # CACHE
 
     def __init__(self, **kwargs: dict[str, str | dict | list]) -> None:
         """
@@ -190,6 +192,11 @@ class Model:
             # MongoDB genera un _id automáticamente, lo guardamos para poder usarlo después
             id_mongo = self._db.insert_one(self._data)
             self._data["_id"] = id_mongo.inserted_id
+
+            # Si existe cache, guardamos el documento nuevo en Redis
+            if self._cache is not None:
+                self._cache.set(self._db.name, self._data["_id"], self._data)
+
         else: # entra si se ha guardado el documento en la base de datos
             cambios = {}
 
@@ -205,6 +212,10 @@ class Model:
                 {"$set": cambios}
             )
 
+            # Si existe cache, invalidamos el documento actualizado
+            if self._cache is not None:
+                self._cache.invalidar(self._db.name, self._data["_id"])
+
         # Ya hemos guardado los cambios por lo que limpiamos la lista de atributos modificados
         self._modified_vars.clear()
 
@@ -216,6 +227,10 @@ class Model:
         """
         #TODO
         self._db.delete_one({"_id":self._data["_id"]})
+
+        # Si existe caché, invalidamos el documento eliminado
+        if self._cache is not None:
+            self._cache.invalidar(self._db.name, self._data["_id"])
     
     @classmethod
     def find(cls, filter: dict[str, str | dict]) -> Any:
@@ -276,12 +291,16 @@ class Model:
                 Modelo del documento encontrado o None si no se encuentra
         """ 
         #TODO
+        # Comprobamos que estemos usando la caché
+        if (cls._cache is None):
+            return None
+
         # Buscamos el documento en Redis
-        document = cache.get(cls._db.name, id)
+        document = cls._cache.get(cls._db.name, id)
 
         # Si está en caché lo devolvemos
         if document is not None:
-            return document
+            return cls(**document)
 
         # Si no está en redis lo buscamos en mongo
         document = cls._db.find_one({"_id": ObjectId(id)})
@@ -291,7 +310,7 @@ class Model:
             return None
 
         # Guardamos el documento en Redis
-        cache.set(cls._db.name, id, document)
+        cls._cache.set(cls._db.name, id, document)
 
         # Devolvemos el documento como objeto del modelo
         return cls(**document)
@@ -393,14 +412,14 @@ class ModelCursor:
             except StopIteration:
                 break
 
-def initApp(definitions_path: str = "./models.yml", mongodb_uri="mongodb://localhost:27017/", db_name="abd", scope=globals()) -> None:
+def initApp(definitions_path: str = "./models.yml", mongodb_uri="mongodb://localhost:27017/", db_name="abd", scope=globals(), redis_uri: str | None = None) -> None:
     """ 
     Declara las clases que heredan de Model para cada uno de los 
     modelos de las colecciones definidas en definitions_path.
     Inicializa las clases de los modelos proporcionando los indices y 
     atributos admitidos y requeridos para cada una de ellas y la conexión a la
     collecion de la base de datos.
-    
+
     Parameters
     ----------
         definitions_path : str
@@ -416,6 +435,14 @@ def initApp(definitions_path: str = "./models.yml", mongodb_uri="mongodb://local
     client = MongoClient(mongodb_uri) #Conectar al servidor local
     db = client[db_name] # Inicializo la base de datos
 
+    # Redis
+    if redis_uri is not None:
+        cliente_redis = redis.Redis.from_url(redis_uri, decode_responses=True) # Conectamos con Redis usando la direccion recibida
+        Model._cache = cache.CacheDocumentos(cliente_redis) # Creamos la cache
+        Model._cache.configurar_limite() # Configuramos la cache
+    else:
+        Model._cache = None # Sino, trabajamos sin cache
+
     #TODO
     # Declarar tantas clases modelo colecciones existan en la base de datos
     # Leer el fichero de definiciones de modelos para obtener las colecciones,
@@ -427,7 +454,7 @@ def initApp(definitions_path: str = "./models.yml", mongodb_uri="mongodb://local
     # diccionario. Por eso se inicializa a traves de scope y no por su nombre,
     # que ahi todavia no existe.
     #  scope["MiModelo"].init_class(db_collection=None, indexes=None, required_vars=None, admissible_vars=None)
-     
+
     with open(definitions_path, "r") as fichero: #Lee el fichero
         diccionario = yaml.safe_load(fichero) # Lo combierto a dict
 
